@@ -6,8 +6,6 @@ versionCode=$(grep versionCode $MODDIR/module.prop | sed 's/versionCode=//g' )
 
 # test out writables, prefer tmpfs
 folder=$MODDIR
-[ -w /storage ] && folder=/storage
-[ -w /tmp ] && folder=/tmp 
 [ -w /debug_ramdisk ] && folder=/debug_ramdisk
 
 
@@ -15,9 +13,8 @@ echo "[+] bindhosts v$versionCode"
 echo "[%] action.sh"
 echo "[%] standalone hosts-based-adblocking implementation"
 
-
 # just in case user deletes them
-files="blacklist.txt sources.txt whitelist.txt"
+files="custom.txt blacklist.txt sources.txt whitelist.txt"
 for i in $files ; do
 	if [ ! -f $MODDIR/$i ] ; then
 		# dont do anything weird, probably intentional
@@ -25,12 +22,6 @@ for i in $files ; do
 		touch $MODDIR/$i
 	fi	
 done
-if [ ! -f $MODDIR/custom.txt ] ; then
-	echo "[ ] generating defaults"
-	printf "127.0.0.1 localhost\n::1 localhost\n" > $MODDIR/custom.txt	
-fi	
-
-
 
 if [ -w /system/etc/hosts ] ; then
 	# probe for downloaders
@@ -51,8 +42,6 @@ illusion () {
 
 adblock() {
 	illusion
-	# always restore user's custom rules
-	grep -v "#" $MODDIR/custom.txt > $folder/temphosts
 	# sources	
 	echo "[+] processing sources"
 	grep -v "#" $MODDIR/sources.txt | grep http > /dev/null || (echo "[x] no sources found 😭" ; echo "[x] sources.txt needs correction 💢")
@@ -63,6 +52,10 @@ adblock() {
 		 # add a newline incase they dont
 		echo "" >> $folder/temphosts
 	done
+	# localhost
+	printf "127.0.0.1 localhost\n::1 localhost\n" > /system/etc/hosts
+	# always restore user's custom rules
+	grep -v "#" $MODDIR/custom.txt >> /system/etc/hosts
 	# blacklist.txt
 	for i in $(grep -v "#" $MODDIR/blacklist.txt ); do echo "127.0.0.1 $i" >> $folder/temphosts; done
 	# whitelist.txt
@@ -70,15 +63,17 @@ adblock() {
 	# optimization thanks to Earnestly from #bash on libera, TIL something 
 	# sed strip out everything with #, double space to single space, replace all 0.0.0.0 with 127.0.0.1
 	# then sort uniq, then grep out whitelist.txt from it
-	sed '/#/d; s/  / /g; s/0.0.0.0/127.0.0.1/' $folder/temphosts | sort -u | grep -Fxvf $MODDIR/whitelist.txt > /system/etc/hosts
+	sed '/#/d; s/  / /g; s/0.0.0.0/127.0.0.1/' $folder/temphosts | sort -u | grep -Fxvf $MODDIR/whitelist.txt >> /system/etc/hosts
 	# mark it, will be read by service.sh to deduce
 	echo "# bindhosts v$versionCode" >> /system/etc/hosts
 }
 
 reset() {
 	echo "[+] reset toggled!" 
+	# localhost
+	printf "127.0.0.1 localhost\n::1 localhost\n" > /system/etc/hosts
 	# always restore user's custom rules
-	grep -v "#" $MODDIR/custom.txt > /system/etc/hosts
+	grep -v "#" $MODDIR/custom.txt >> /system/etc/hosts
         sed -i '/description/d' $MODDIR/module.prop
         echo "description=status: active ✅" >> $MODDIR/module.prop
         illusion
