@@ -1,9 +1,5 @@
 #!/usr/bin/env sh
 MODDIR="/data/adb/modules/bindhosts"
-
-#susfs >=110 support
-SUSFS_BIN=/data/adb/ksu/bin/ksu_susfs
-
 # grab own info (version)
 versionCode=$(grep versionCode $MODDIR/module.prop | sed 's/versionCode=//g' )
 
@@ -14,7 +10,8 @@ folder=$MODDIR
 [ -w /debug_ramdisk ] && folder=/debug_ramdisk
 
 echo "[+] bindhosts v$versionCode"
-echo "[+] action.sh DEMO"
+echo "[%] action.sh"
+echo "[%] standalone hosts-based-adblocking implementation"
 
 if [ -w /system/etc/hosts ] ; then
 	# look for downloaders
@@ -31,7 +28,6 @@ fi
 illusion () {
 	x=$((RANDOM%4 + 6)); while [ $x -gt 1 ] ; do echo '[.]' ; sleep 0.1 ; x=$((x-1)) ; done &
 }
-
 
 adblock() {
 	illusion
@@ -69,7 +65,6 @@ reset() {
         sleep 3
         # reset state
         rm $folder/bindhosts_state
-        exit
 }
 run() {
 	adblock
@@ -85,9 +80,11 @@ run() {
 
 # toggle
 if [ -f $folder/bindhosts_state ]; then
-        reset
+	reset
 else
-        run
+	# basically if no bindhosts_state and hosts file is marked, it likely device rebooted and user is triggering an upgrade.
+	grep "# bindhosts v" /system/etc/hosts > /dev/null 2>&1 && echo "[+] update triggered!"
+	run
 fi
 
 # EOF
